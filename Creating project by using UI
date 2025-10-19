@@ -1,0 +1,140 @@
+## **Project Overview**
+
+This project simulates a payment processing system using AWS services:
+
+1. **Payment Request** – The client sends payment requests to an API Gateway or Lambda.
+2. **SQS Queue** – Payment requests are queued for asynchronous processing.
+3. **Lambda Processor** – Reads messages from SQS, processes the payment logic, and updates status.
+4. **SNS Notification** – Sends notifications (success/failure) to subscribers like email or SMS.
+5. **CloudWatch** – Logs for monitoring.
+
+---
+
+## **AWS Services Used**
+
+* **SQS** – Queue to handle payment requests.
+* **SNS** – Notification service for payment status updates.
+* **Lambda** – Serverless function to process payments.
+* **IAM Roles** – For Lambda access to SQS and SNS.
+* **CloudWatch Logs** – To monitor payment processing.
+
+---
+
+## **Step-by-Step Setup via AWS UI**
+
+### **Step 1: Create an SQS Queue**
+
+1. Go to **AWS Console → SQS → Create Queue**.
+2. Choose queue type: **Standard Queue** (for high throughput).
+3. Name: `PaymentRequestsQueue`.
+4. Keep default settings (or adjust visibility timeout if needed).
+5. Create queue.
+
+---
+
+### **Step 2: Create an SNS Topic**
+
+1. Go to **AWS Console → SNS → Topics → Create Topic**.
+2. Choose type: **Standard**.
+3. Name: `PaymentNotifications`.
+4. Create topic.
+5. Add **subscription** (Email/SMS):
+
+   * Protocol: `Email` or `SMS`.
+   * Endpoint: your email/phone number.
+6. Confirm subscription via email/SMS.
+
+---
+
+### **Step 3: Create IAM Role for Lambda**
+
+1. Go to **IAM → Roles → Create Role → Lambda**.
+2. Attach policies:
+
+   * `AmazonSQSFullAccess` (for reading messages)
+   * `AmazonSNSFullAccess` (for publishing notifications)
+   * `CloudWatchLogsFullAccess`
+3. Name: `LambdaPaymentRole`.
+
+---
+
+### **Step 4: Create Lambda Function**
+
+1. Go to **Lambda → Create function → Author from scratch**.
+2. Name: `PaymentProcessor`.
+3. Runtime: `Python 3.11` (or Node.js).
+4. Execution Role: Select `LambdaPaymentRole`.
+5. Click **Create Function**.
+
+**Sample Python Code for Lambda**:
+
+```python
+import json
+import boto3
+
+sns = boto3.client('sns')
+sqs = boto3.client('sqs')
+
+SNS_TOPIC_ARN = 'arn:aws:sns:region:account-id:PaymentNotifications'
+QUEUE_URL = 'https://sqs.region.amazonaws.com/account-id/PaymentRequestsQueue'
+
+def lambda_handler(event, context):
+    for record in event['Records']:
+        body = json.loads(record['body'])
+        payment_id = body.get('payment_id')
+        amount = body.get('amount')
+
+        # Simulate payment processing
+        status = "SUCCESS" if amount < 1000 else "FAILURE"
+
+        # Send notification
+        message = f"Payment {payment_id} processed. Status: {status}"
+        sns.publish(TopicArn=SNS_TOPIC_ARN, Message=message)
+
+        print(message)
+
+    return {"status": "completed"}
+```
+
+---
+
+### **Step 5: Configure SQS as Lambda Trigger**
+
+1. Go to your Lambda function → **Add Trigger → SQS**.
+2. Select `PaymentRequestsQueue`.
+3. Enable trigger.
+
+---
+
+### **Step 6: Test the Flow**
+
+1. Go to **SQS → PaymentRequestsQueue → Send Message**.
+2. Message Body:
+
+```json
+{
+  "payment_id": "12345",
+  "amount": 500
+}
+```
+
+3. Lambda will automatically process it.
+4. Check SNS subscriber (email/SMS) for notification.
+
+---
+
+### **Optional: Monitoring**
+
+* Go to **CloudWatch Logs → Lambda → PaymentProcessor** to see logs.
+* Set up **CloudWatch Alarms** for failures.
+
+---
+
+✅ **Outcome:**
+
+* Payment requests are queued in SQS.
+* Lambda processes them asynchronously.
+* Notifications are sent via SNS.
+* Everything is serverless, scalable, and can be monitored via AWS UI.
+
+---
